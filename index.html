@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Polymarket PnL Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Epilogue:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font-display: 'Epilogue', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --bg:           #f5f4f0;
+  --bg-card:      #ffffff;
+  --bg-input:     #fafaf8;
+  --bg-drop:      #f0efe9;
+  --border:       #e2e0d8;
+  --border-focus: #2563eb;
+  --text:         #111110;
+  --text-2:       #4a4a44;
+  --text-3:       #8a8880;
+  --accent:       #2563eb;
+  --accent-soft:  #eff4ff;
+  --green:        #16a34a;
+  --green-soft:   #f0fdf4;
+  --red:          #dc2626;
+  --red-soft:     #fff5f5;
+  --amber:        #d97706;
+  --amber-soft:   #fffbeb;
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:    0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:    0 12px 32px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05);
+  --radius:       10px;
+  --radius-sm:    6px;
+}
+[data-theme="dark"] {
+  --bg:           #0f1115;
+  --bg-card:      #171a1f;
+  --bg-input:     #1c2028;
+  --bg-drop:      #1c2028;
+  --border:       #262c36;
+  --border-focus: #3b82f6;
+  --text:         #e8e6e0;
+  --text-2:       #9ca3af;
+  --text-3:       #5a6070;
+  --accent:       #3b82f6;
+  --accent-soft:  #1e2a40;
+  --green:        #22c55e;
+  --green-soft:   #0d2018;
+  --red:          #f87171;
+  --red-soft:     #2a1018;
+  --amber:        #fbbf24;
+  --amber-soft:   #271e0a;
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:    0 4px 12px rgba(0,0,0,.4);
+  --shadow-lg:    0 12px 32px rgba(0,0,0,.5);
+}
+
+html { font-size: 15px; }
+body {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background .25s, color .25s;
+  line-height: 1.6;
+}
+.page { max-width: 1280px; margin: 0 auto; padding: 28px 24px 80px; }
+
+/* HEADER */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+}
+.logo { display: flex; flex-direction: column; gap: 2px; }
+.logo-title {
+  font-family: var(--font-display); font-size: 1.5rem; font-weight: 900;
+  letter-spacing: -.03em; color: var(--text); line-height: 1;
+}
+.logo-sub {
+  font-size: .72rem; color: var(--text-3); letter-spacing: .08em; text-transform: uppercase;
+}
+.header-right { display: flex; align-items: center; gap: 12px; }
+.badge-live {
+  display: flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 500;
+  color: var(--text-3); letter-spacing: .06em; text-transform: uppercase;
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 99px;
+}
+.badge-live .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); }
+.badge-live.active .dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent);
+  animation: pulse 2s infinite;
+}
+.badge-live.active { color: var(--green); border-color: color-mix(in srgb, var(--green) 30%, transparent); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.theme-toggle {
+  width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--text-2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; transition: all .2s; box-shadow: var(--shadow-sm);
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* DROP ZONE */
+#drop-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  background: var(--bg-drop); padding: 48px 32px; text-align: center;
+  cursor: pointer; transition: all .2s; margin-bottom: 32px; position: relative;
+}
+#drop-zone.drag-over { border-color: var(--accent); background: var(--accent-soft); }
+#drop-zone:hover { border-color: var(--accent); }
+#drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.drop-icon { font-size: 2rem; margin-bottom: 10px; line-height: 1; }
+.drop-title { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.drop-sub { font-size: .78rem; color: var(--text-3); }
+.drop-filename { margin-top: 10px; font-size: .78rem; font-weight: 600; color: var(--accent); display: none; }
+
+.section { display: none; }
+.section.visible { display: block; }
+
+/* STAT CARDS */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 20px; box-shadow: var(--shadow-sm); transition: box-shadow .2s, transform .2s;
+  animation: fadeUp .35s ease both;
+}
+.stat-card:nth-child(1){animation-delay:.04s} .stat-card:nth-child(2){animation-delay:.08s}
+.stat-card:nth-child(3){animation-delay:.12s} .stat-card:nth-child(4){animation-delay:.16s}
+.stat-card:nth-child(5){animation-delay:.20s}
+.stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.stat-label { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+.stat-value { font-family: var(--font-display); font-size: 1.75rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--text); }
+.stat-value.positive { color: var(--green); }
+.stat-value.negative { color: var(--red); }
+.stat-value.highlight { color: var(--accent); }
+.stat-sub { font-size: .72rem; color: var(--text-3); margin-top: 4px; }
+
+/* FILTERS */
+.filters-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px 22px; margin-bottom: 24px; box-shadow: var(--shadow-sm); animation: fadeUp .35s ease both;
+}
+.filters-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.filters-title { font-family: var(--font-display); font-size: .9rem; font-weight: 700; color: var(--text); }
+.btn-ghost {
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 500; color: var(--text-3);
+  background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 10px; cursor: pointer; transition: all .2s;
+}
+.btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
+.filters-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.filter-group { display: flex; flex-direction: column; gap: 5px; }
+.filter-label { font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.filter-select {
+  font-family: var(--font-mono); font-size: .78rem; font-weight: 500; color: var(--text);
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 7px 28px 7px 10px; outline: none; cursor: pointer; transition: border-color .2s; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8880' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.filter-select:focus { border-color: var(--border-focus); }
+
+/* AGGREGATE BAR */
+.aggregate-bar {
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: var(--radius); padding: 14px 20px; margin-bottom: 20px;
+  display: none; align-items: center; flex-wrap: wrap; gap: 20px; animation: fadeUp .25s ease both;
+}
+.aggregate-bar.visible { display: flex; }
+.agg-item { display: flex; flex-direction: column; gap: 2px; }
+.agg-label { font-size: .65rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); opacity: .7; }
+.agg-value { font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--accent); }
+.agg-value.pos { color: var(--green); }
+.agg-value.neg { color: var(--red); }
+.agg-divider { width: 1px; height: 36px; background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.agg-title { font-family: var(--font-display); font-size: .78rem; font-weight: 700; color: var(--accent); margin-right: 4px; }
+
+/* TABLE */
+.table-wrap {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); overflow: hidden; animation: fadeUp .4s ease both;
+}
+.table-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+}
+.table-title { font-family: var(--font-display); font-size: .88rem; font-weight: 700; color: var(--text); }
+.row-count { font-size: .72rem; font-weight: 500; color: var(--text-3); background: var(--bg); border: 1px solid var(--border); border-radius: 99px; padding: 3px 10px; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+thead th {
+  font-size: .65rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-3); text-align: left; padding: 10px 16px;
+  border-bottom: 1px solid var(--border); background: var(--bg-input);
+  white-space: nowrap; cursor: pointer; user-select: none; transition: color .15s;
+}
+thead th:hover { color: var(--accent); }
+thead th.sorted { color: var(--accent); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+td { padding: 11px 16px; color: var(--text-2); white-space: nowrap; }
+td.mono { font-family: var(--font-mono); }
+.pill { display: inline-flex; align-items: center; font-size: .7rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+.pill-market { background: var(--accent-soft); color: var(--accent); font-size: .67rem; letter-spacing: .04em; }
+.pill-win    { background: var(--green-soft); color: var(--green); }
+.pill-loss   { background: var(--red-soft);   color: var(--red);   }
+.pill-neutral{ background: var(--bg); color: var(--text-3); border: 1px solid var(--border); }
+.winrate-bar { display: flex; align-items: center; gap: 8px; }
+.bar-track { flex: 1; min-width: 60px; height: 5px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 99px; transition: width .4s cubic-bezier(.25,.46,.45,.94); }
+.bar-fill.high { background: var(--green); }
+.bar-fill.mid  { background: var(--amber); }
+.bar-fill.low  { background: var(--red);   }
+.bar-label { font-size: .72rem; font-weight: 600; min-width: 38px; }
+.bar-label.high { color: var(--green); }
+.bar-label.mid  { color: var(--amber); }
+.bar-label.low  { color: var(--red);   }
+.pnl-cell { font-family: var(--font-display); font-weight: 700; font-size: .85rem; }
+.pnl-cell.pos { color: var(--green); }
+.pnl-cell.neg { color: var(--red); }
+.empty-state { padding: 52px 24px; text-align: center; color: var(--text-3); font-size: .82rem; }
+
+@media (max-width: 640px) {
+  header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo">
+      <span class="logo-title">PnL Dashboard</span>
+      <span class="logo-sub">Polymarket Up/Down Tracker</span>
+    </div>
+    <div class="header-right">
+      <div class="badge-live" id="status-badge">
+        <span class="dot"></span>
+        <span id="status-text">No data</span>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">&#9728;&#65039;</button>
+    </div>
+  </header>
+
+  <div id="drop-zone">
+    <input type="file" accept=".csv" id="file-input" />
+    <div class="drop-icon">&#128194;</div>
+    <div class="drop-title">Drop your pnl_tracker.csv here</div>
+    <div class="drop-sub">or click to browse &mdash; nothing is uploaded, all local</div>
+    <div class="drop-filename" id="drop-filename"></div>
+  </div>
+
+  <div class="section" id="main-section">
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="filters-card">
+      <div class="filters-header">
+        <span class="filters-title">Filter Combinations</span>
+        <button class="btn-ghost" id="reset-filters">Reset all</button>
+      </div>
+      <div class="filters-grid" id="filters-grid"></div>
+    </div>
+    <div class="aggregate-bar" id="aggregate-bar"></div>
+    <div class="table-wrap">
+      <div class="table-header-row">
+        <span class="table-title">Results</span>
+        <span class="row-count" id="row-count">0 rows</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="empty-state" style="display:none">No rows match the selected filters.</div>
+    </div>
+  </div>
+
+</div>
+<script>
+var allRows = [], sortCol = null, sortDir = 1;
+
+var COLS = [
+  { key:'market',        label:'Market'       },
+  { key:'trigger_price', label:'Trigger $'    },
+  { key:'order_price',   label:'Limit $'      },
+  { key:'window_min',    label:'Win. Min (s)' },
+  { key:'window_max',    label:'Win. Max (s)' },
+  { key:'wins',          label:'Wins'         },
+  { key:'losses',        label:'Losses'       },
+  { key:'unfilled',      label:'Unfilled'     },
+  { key:'winrate',       label:'Winrate'      },
+  { key:'pnl',           label:'P/L'          }
+];
+var FILTER_COLS = ['market','trigger_price','order_price','window_min','window_max'];
+
+// Theme
+var htmlEl = document.documentElement;
+var themeBtn = document.getElementById('theme-toggle');
+var isDark = false;
+function setTheme(dark) {
+  isDark = dark;
+  htmlEl.setAttribute('data-theme', dark ? 'dark' : 'light');
+  themeBtn.innerHTML = dark ? '&#127769;&#65039;' : '&#9728;&#65039;';
+  try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch(e) {}
+}
+themeBtn.addEventListener('click', function() { setTheme(!isDark); });
+try { if (localStorage.getItem('theme') === 'dark') setTheme(true); } catch(e) {}
+
+// CSV parse
+function parseCSV(text) {
+  var lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase().replace(/\s+/g,'_'); });
+  return lines.slice(1).map(function(line) {
+    var vals = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { inQ = !inQ; continue; }
+      if (c === ',' && !inQ) { vals.push(cur.trim()); cur = ''; continue; }
+      cur += c;
+    }
+    vals.push(cur.trim());
+    var row = {};
+    headers.forEach(function(h, i) { row[h] = vals[i] !== undefined ? vals[i] : ''; });
+    return row;
+  }).filter(function(r) { return r.market; });
+}
+
+function coerce(row) {
+  var wins = parseInt(row.wins) || 0;
+  var losses = parseInt(row.losses) || 0;
+  var total = wins + losses;
+  return {
+    market:        row.market || '',
+    trigger_price: parseFloat(row.trigger_price) || 0,
+    order_price:   parseFloat(row.order_price) || 0,
+    window_min:    parseInt(row.window_min) || 0,
+    window_max:    parseInt(row.window_max) || 0,
+    wins:          wins,
+    losses:        losses,
+    unfilled:      parseInt(row.unfilled) || 0,
+    pnl:           parseFloat(row.pnl) || 0,
+    winrate:       total > 0 ? (wins / total) * 100 : 0
+  };
+}
+
+// File handling
+var dropZone = document.getElementById('drop-zone');
+var fileInput = document.getElementById('file-input');
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', function(e) { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+function loadFile(file) {
+  document.getElementById('drop-filename').textContent = '&#10003; ' + file.name;
+  document.getElementById('drop-filename').style.display = 'block';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var raw = parseCSV(e.target.result);
+    allRows = raw.map(coerce);
+    if (!allRows.length) { alert('No valid rows found. Check CSV format.'); return; }
+    initDashboard();
+  };
+  reader.readAsText(file);
+}
+
+function initDashboard() {
+  document.getElementById('main-section').classList.add('visible');
+  var badge = document.getElementById('status-badge');
+  badge.classList.add('active');
+  document.getElementById('status-text').textContent = allRows.length + ' configs loaded';
+  buildFilters();
+  renderAll();
+}
+
+// Filters
+function uniqueSorted(key) {
+  var seen = {}, vals = [];
+  allRows.forEach(function(r) { if (!seen[r[key]]) { seen[r[key]] = true; vals.push(r[key]); } });
+  vals.sort(function(a, b) { return typeof a === 'number' ? a - b : String(a).localeCompare(String(b)); });
+  return vals;
+}
+function buildFilters() {
+  var grid = document.getElementById('filters-grid');
+  grid.innerHTML = '';
+  FILTER_COLS.forEach(function(key) {
+    var col = null;
+    for (var i = 0; i < COLS.length; i++) { if (COLS[i].key === key) { col = COLS[i]; break; } }
+    var vals = uniqueSorted(key);
+    var g = document.createElement('div'); g.className = 'filter-group';
+    var lbl = document.createElement('label'); lbl.className = 'filter-label'; lbl.textContent = col.label;
+    var sel = document.createElement('select'); sel.className = 'filter-select'; sel.id = 'filter-' + key;
+    sel.innerHTML = '<option value="">All</option>';
+    vals.forEach(function(v) {
+      var opt = document.createElement('option'); opt.value = v;
+      if (key === 'trigger_price' || key === 'order_price') {
+        opt.textContent = '$' + parseFloat(v).toFixed(2);
+      } else if (key === 'window_min' || key === 'window_max') {
+        opt.textContent = v + 's';
+      } else {
+        opt.textContent = v;
+      }
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', renderAll);
+    g.appendChild(lbl); g.appendChild(sel); grid.appendChild(g);
+  });
+}
+function getFilters() {
+  var f = {};
+  FILTER_COLS.forEach(function(key) {
+    var el = document.getElementById('filter-' + key);
+    if (el && el.value !== '') f[key] = el.value;
+  });
+  return f;
+}
+document.getElementById('reset-filters').addEventListener('click', function() {
+  FILTER_COLS.forEach(function(key) {
+    var el = document.getElementById('filter-' + key);
+    if (el) el.value = '';
+  });
+  renderAll();
+});
+
+// Stats
+function sum(rows, key) { return rows.reduce(function(s, r) { return s + r[key]; }, 0); }
+function renderStats(rows) {
+  var wins = sum(rows,'wins'), losses = sum(rows,'losses');
+  var unfilled = sum(rows,'unfilled'), pnl = sum(rows,'pnl');
+  var total = wins + losses, wr = total > 0 ? (wins / total * 100) : 0;
+  var sorted = rows.slice().sort(function(a,b) { return b.pnl - a.pnl; });
+  var best = sorted[0];
+  var bestLabel = best ? ('T' + best.trigger_price.toFixed(2) + ' / L' + best.order_price.toFixed(2)) : '-';
+  var bestPnl = best ? ((best.pnl >= 0 ? '+' : '') + '$' + Math.abs(best.pnl).toFixed(2)) : '-';
+  var pnlSign = pnl >= 0 ? '+' : '';
+  var wrClass = wr >= 60 ? 'positive' : wr >= 45 ? 'highlight' : 'negative';
+  var pnlClass = pnl >= 0 ? 'positive' : 'negative';
+  document.getElementById('stats-grid').innerHTML =
+    '<div class="stat-card"><div class="stat-label">Total Trades</div><div class="stat-value">' + total + '</div><div class="stat-sub">' + unfilled + ' unfilled excluded</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Win / Loss</div><div class="stat-value">' + wins + '<span style="color:var(--text-3);font-size:1rem">/' + losses + '</span></div><div class="stat-sub">across ' + rows.length + ' config' + (rows.length !== 1 ? 's' : '') + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Overall Winrate</div><div class="stat-value ' + wrClass + '">' + wr.toFixed(1) + '%</div><div class="stat-sub">' + total + ' resolved trades</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Total P/L</div><div class="stat-value ' + pnlClass + '">' + pnlSign + '$' + Math.abs(pnl).toFixed(2) + '</div><div class="stat-sub">all configs combined</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Best Config</div><div class="stat-value highlight" style="font-size:1rem">' + bestLabel + '</div><div class="stat-sub">P/L: ' + bestPnl + '</div></div>';
+}
+
+// Aggregate bar
+function renderAggregate(rows) {
+  var bar = document.getElementById('aggregate-bar');
+  var hasFilters = FILTER_COLS.some(function(k) {
+    var el = document.getElementById('filter-' + k);
+    return el && el.value !== '';
+  });
+  if (!hasFilters || !rows.length) { bar.classList.remove('visible'); return; }
+  var wins = sum(rows,'wins'), losses = sum(rows,'losses');
+  var unfilled = sum(rows,'unfilled'), pnl = sum(rows,'pnl');
+  var total = wins + losses, wr = total > 0 ? (wins / total * 100) : 0;
+  var pnlStr = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+  var wrClass = wr >= 60 ? 'pos' : wr < 45 ? 'neg' : '';
+  var pnlClass = pnl >= 0 ? 'pos' : 'neg';
+  bar.innerHTML =
+    '<span class="agg-title">Filtered Aggregate (' + rows.length + ' config' + (rows.length !== 1 ? 's' : '') + ')</span>' +
+    '<div class="agg-divider"></div>' +
+    '<div class="agg-item"><span class="agg-label">Trades</span><span class="agg-value">' + total + '</span></div>' +
+    '<div class="agg-item"><span class="agg-label">W / L</span><span class="agg-value">' + wins + ' / ' + losses + '</span></div>' +
+    '<div class="agg-item"><span class="agg-label">Unfilled</span><span class="agg-value">' + unfilled + '</span></div>' +
+    '<div class="agg-item"><span class="agg-label">Winrate</span><span class="agg-value ' + wrClass + '">' + wr.toFixed(1) + '%</span></div>' +
+    '<div class="agg-divider"></div>' +
+    '<div class="agg-item"><span class="agg-label">Total P/L</span><span class="agg-value ' + pnlClass + '">' + pnlStr + '</span></div>';
+  bar.classList.add('visible');
+}
+
+// Table
+function buildTableHead() {
+  var html = '<tr>';
+  COLS.forEach(function(c) {
+    var isSorted = sortCol === c.key;
+    var arrow = isSorted ? (sortDir === 1 ? ' &uarr;' : ' &darr;') : ' <span style="opacity:.3">&#8597;</span>';
+    html += '<th data-key="' + c.key + '" class="' + (isSorted ? 'sorted' : '') + '">' + c.label + arrow + '</th>';
+  });
+  html += '</tr>';
+  document.getElementById('table-head').innerHTML = html;
+  document.querySelectorAll('#table-head th').forEach(function(th) {
+    th.addEventListener('click', function() {
+      if (sortCol === th.dataset.key) { sortDir = -sortDir; } else { sortCol = th.dataset.key; sortDir = 1; }
+      renderAll();
+    });
+  });
+}
+function renderTable(rows) {
+  buildTableHead();
+  var tbody = document.getElementById('table-body');
+  var empty = document.getElementById('empty-state');
+  document.getElementById('row-count').textContent = rows.length + ' row' + (rows.length !== 1 ? 's' : '');
+  if (!rows.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  var sorted = rows.slice();
+  if (sortCol) {
+    sorted.sort(function(a, b) {
+      var av = a[sortCol], bv = b[sortCol];
+      return (typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv))) * sortDir;
+    });
+  }
+  tbody.innerHTML = sorted.map(function(r) {
+    var wr = r.winrate, wrc = wr >= 60 ? 'high' : wr >= 45 ? 'mid' : 'low';
+    var pnlStr = (r.pnl >= 0 ? '+' : '') + '$' + Math.abs(r.pnl).toFixed(2);
+    var pnlClass = r.pnl >= 0 ? 'pos' : 'neg';
+    return '<tr>' +
+      '<td><span class="pill pill-market">' + r.market + '</span></td>' +
+      '<td class="mono">$' + r.trigger_price.toFixed(2) + '</td>' +
+      '<td class="mono">$' + r.order_price.toFixed(2) + '</td>' +
+      '<td class="mono">' + r.window_min + 's</td>' +
+      '<td class="mono">' + r.window_max + 's</td>' +
+      '<td>' + (r.wins > 0 ? '<span class="pill pill-win">' + r.wins + 'W</span>' : '<span style="color:var(--text-3)">0W</span>') + '</td>' +
+      '<td>' + (r.losses > 0 ? '<span class="pill pill-loss">' + r.losses + 'L</span>' : '<span style="color:var(--text-3)">0L</span>') + '</td>' +
+      '<td>' + (r.unfilled > 0 ? '<span class="pill pill-neutral">' + r.unfilled + 'U</span>' : '<span style="color:var(--text-3)">0U</span>') + '</td>' +
+      '<td><div class="winrate-bar"><div class="bar-track"><div class="bar-fill ' + wrc + '" style="width:' + wr.toFixed(1) + '%"></div></div><span class="bar-label ' + wrc + '">' + wr.toFixed(1) + '%</span></div></td>' +
+      '<td><span class="pnl-cell ' + pnlClass + '">' + pnlStr + '</span></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function renderAll() {
+  var filters = getFilters();
+  var filtered = allRows.filter(function(r) {
+    return Object.keys(filters).every(function(k) {
+      var v = filters[k];
+      if (!v) return true;
+      var rv = r[k];
+      return typeof rv === 'number' ? rv === Number(v) : String(rv) === String(v);
+    });
+  });
+  renderStats(filtered);
+  renderAggregate(filtered);
+  renderTable(filtered);
+}
+</script>
+</body>
+</html>
