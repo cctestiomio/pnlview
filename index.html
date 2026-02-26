@@ -88,13 +88,7 @@ nav { display:flex; align-items:center; justify-content:space-between; margin-bo
 .fg select { font-family:'Inter',sans-serif; font-size:.78rem; font-weight:500; color:var(--text); background:var(--bg-input); border:1px solid var(--border); border-radius:var(--rsm); padding:6px 26px 6px 9px; outline:none; cursor:pointer; transition:border-color .15s; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; }
 .fg select:focus { border-color:var(--accent); }
 
-/* TIME BUCKET FILTER — full-width row below main filters */
-.bucket-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
-.bucket-lbl { font-size:.62rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--text3); white-space:nowrap; }
-.bucket-btns { display:flex; flex-wrap:wrap; gap:5px; }
-.bbtn { font-size:.7rem; font-weight:600; padding:4px 11px; border-radius:99px; border:1px solid var(--border); background:var(--bg-input); color:var(--text3); cursor:pointer; transition:all .15s; font-family:inherit; white-space:nowrap; }
-.bbtn:hover { border-color:var(--purple); color:var(--purple); }
-.bbtn.active { background:var(--purple-bg); border-color:var(--purple); color:var(--purple); }
+
 
 /* TIME HEATMAP SECTION */
 .heatmap-wrap { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; margin-bottom:12px; box-shadow:var(--sh); }
@@ -186,11 +180,7 @@ td.n { font-size:.77rem; font-weight:500; }
       <button class="rbtn" id="rbtn">Reset all</button>
     </div>
     <div class="frow" id="frow"></div>
-    <!-- Time bucket strip -->
-    <div class="bucket-row">
-      <span class="bucket-lbl">Trigger Time</span>
-      <div class="bucket-btns" id="bbtnrow"></div>
-    </div>
+
   </div>
 
   <!-- Heatmap: winrate by time bucket -->
@@ -216,7 +206,7 @@ td.n { font-size:.77rem; font-weight:500; }
 </div>
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
-var R=[], sk=null, sd=1, activeBucket=null;
+var R=[], sk=null, sd=1;
 
 // ─── Columns ─────────────────────────────────────────────────────────────────
 var COLS=[
@@ -225,7 +215,8 @@ var COLS=[
   {k:'order_price',h:'Limit'},
   {k:'window_min',h:'Win. Min'},
   {k:'window_max',h:'Win. Max'},
-  {k:'secs_at_trigger',h:'Trig. At'},
+  {k:'time_bucket',h:'Trig. Time'},
+  {k:'secs_at_trigger',h:'Trig. At (s)'},
   {k:'wins',h:'Wins'},
   {k:'losses',h:'Losses'},
   {k:'unfilled',h:'Unfilled'},
@@ -233,35 +224,9 @@ var COLS=[
   {k:'pnl',h:'P / L'}
 ];
 
-// Dropdown filter keys (NOT including secs_at_trigger — that uses bucket UI)
-var FK=['market','trigger_price','order_price','window_min','window_max'];
+// Dropdown filter keys
+var FK=['market','trigger_price','order_price','window_min','window_max','time_bucket'];
 
-// ─── Time buckets ─────────────────────────────────────────────────────────────
-// Buckets are defined as [label, minSecs, maxSecs] (inclusive min, exclusive max).
-// Auto-generated from the data range; these are the starting presets.
-var PRESET_BUCKETS=[
-  ['0–60s',    0,   60],
-  ['60–120s',  60,  120],
-  ['120–180s', 120, 180],
-  ['180–240s', 180, 240],
-  ['240–300s', 240, 300],
-  ['300–450s', 300, 450],
-  ['450–600s', 450, 600],
-  ['600–900s', 600, 900],
-];
-
-function getBucketLabel(secs) {
-  for (var i=0; i<PRESET_BUCKETS.length; i++) {
-    var b=PRESET_BUCKETS[i];
-    if (secs >= b[1] && secs < b[2]) return b[0];
-  }
-  return secs+'s';
-}
-
-function inBucket(secs, bucket) {
-  if (!bucket) return true;
-  return secs >= bucket[1] && secs < bucket[2];
-}
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 var root=document.documentElement, tbtn=document.getElementById('tbtn'), dark=false;
@@ -286,12 +251,14 @@ function csv(t){
 function cook(r){
   var w=parseInt(r.wins)||0, l=parseInt(r.losses)||0, t=w+l;
   var secs=parseInt(r.secs_at_trigger)||0;
+  function bucketFor(s){var B=[['0–60s',0,60],['60–120s',60,120],['120–180s',120,180],['180–240s',180,240],['240–300s',240,300],['300–450s',300,450],['450–600s',450,600],['600–900s',600,900]];for(var i=0;i<B.length;i++){if(s>=B[i][1]&&s<B[i][2])return B[i][0];}return s+'s';}
   return {
     market:          r.market||'',
     trigger_price:   parseFloat(r.trigger_price)||0,
     order_price:     parseFloat(r.order_price)||0,
     window_min:      parseInt(r.window_min)||0,
     window_max:      parseInt(r.window_max)||0,
+    time_bucket:     bucketFor(secs),
     secs_at_trigger: secs,
     wins:w, losses:l, unfilled:parseInt(r.unfilled)||0,
     pnl:parseFloat(r.pnl)||0,
@@ -319,9 +286,7 @@ function load(f){
     p.className='pill on';
     document.getElementById('pill-txt').textContent=R.length+' configs loaded';
     document.getElementById('main').className='main on';
-    activeBucket=null;
     buildF();
-    buildBucketBtns();
     go();
   };
   rd.readAsText(f);
@@ -365,61 +330,23 @@ function gf(){
 
 document.getElementById('rbtn').addEventListener('click',function(){
   FK.forEach(function(k){var el=document.getElementById('f-'+k);if(el)el.value='';});
-  activeBucket=null;
-  renderBucketBtns();
   go();
 });
 
-// ─── Bucket buttons ──────────────────────────────────────────────────────────
-function buildBucketBtns(){
-  // Determine which buckets are actually present in the data
-  var present=new Set();
-  R.forEach(function(r){ present.add(getBucketLabel(r.secs_at_trigger)); });
-  renderBucketBtns(present);
-}
-
-function renderBucketBtns(present){
-  var row=document.getElementById('bbtnrow');
-  row.innerHTML='';
-
-  // "All" button
-  var all=document.createElement('button');
-  all.className='bbtn'+(activeBucket===null?' active':'');
-  all.textContent='All times';
-  all.addEventListener('click',function(){ activeBucket=null; renderBucketBtns(); go(); });
-  row.appendChild(all);
-
-  // One button per preset bucket that has any data
-  PRESET_BUCKETS.forEach(function(b){
-    var has=R.some(function(r){ return r.secs_at_trigger>=b[1] && r.secs_at_trigger<b[2]; });
-    if(!has) return;
-    var btn=document.createElement('button');
-    var isActive=activeBucket&&activeBucket[0]===b[0];
-    btn.className='bbtn'+(isActive?' active':'');
-    btn.textContent=b[0];
-    btn.addEventListener('click',function(){
-      activeBucket=isActive?null:b;
-      renderBucketBtns();
-      go();
-    });
-    row.appendChild(btn);
-  });
-}
-
 // ─── Heatmap ──────────────────────────────────────────────────────────────────
+var HM_BUCKETS=[['0–60s',0,60],['60–120s',60,120],['120–180s',120,180],['180–240s',180,240],['240–300s',240,300],['300–450s',300,450],['450–600s',450,600],['600–900s',600,900]];
+
 function buildHeatmap(filtered){
   var grid=document.getElementById('hmgrid');
   grid.innerHTML='';
 
-  // Group by bucket
+  // Group by bucket using ALL data so heatmap always shows full picture
   var bucketData={};
-  PRESET_BUCKETS.forEach(function(b){
-    bucketData[b[0]]={label:b[0],bucket:b,wins:0,losses:0,unfilled:0,pnl:0,count:0};
+  HM_BUCKETS.forEach(function(b){
+    bucketData[b[0]]={wins:0,losses:0,unfilled:0,pnl:0,count:0};
   });
-
-  // Use ALL data (not filtered) for the heatmap so you always see the full picture
   R.forEach(function(r){
-    PRESET_BUCKETS.forEach(function(b){
+    HM_BUCKETS.forEach(function(b){
       if(r.secs_at_trigger>=b[1]&&r.secs_at_trigger<b[2]){
         var bd=bucketData[b[0]];
         bd.wins+=r.wins; bd.losses+=r.losses; bd.unfilled+=r.unfilled; bd.pnl+=r.pnl; bd.count++;
@@ -428,7 +355,7 @@ function buildHeatmap(filtered){
   });
 
   var anyData=false;
-  PRESET_BUCKETS.forEach(function(b){
+  HM_BUCKETS.forEach(function(b){
     var bd=bucketData[b[0]];
     if(!bd.count) return;
     anyData=true;
@@ -438,7 +365,8 @@ function buildHeatmap(filtered){
     if(total===0) wc='z';
     var ps=(bd.pnl>=0?'+':'')+'$'+Math.abs(bd.pnl).toFixed(2);
     var pc=bd.pnl>0?'g':bd.pnl<0?'r':'z';
-    var isActive=activeBucket&&activeBucket[0]===b[0];
+    var sel=document.getElementById('f-time_bucket');
+    var isActive=sel&&sel.value===b[0];
 
     var cell=document.createElement('div');
     cell.className='hm-cell'+(isActive?' active':'');
@@ -448,8 +376,8 @@ function buildHeatmap(filtered){
       '<div class="hm-trades">'+bd.wins+'W / '+bd.losses+'L'+(bd.unfilled?' / '+bd.unfilled+'U':'')+'</div>'+
       '<div class="hm-pnl '+pc+'">'+ps+'</div>';
     cell.addEventListener('click',function(){
-      activeBucket=(isActive?null:b);
-      renderBucketBtns();
+      var sel=document.getElementById('f-time_bucket');
+      if(sel){ sel.value=isActive?'':b[0]; }
       buildHeatmap(filtered);
       go();
     });
@@ -466,7 +394,7 @@ function cards(a){
   var w=s(a,'wins'),l=s(a,'losses'),u=s(a,'unfilled'),p=s(a,'pnl'),t=w+l;
   var wr=t>0?(w/t*100):0;
   var best=a.slice().sort(function(a,b){return b.pnl-a.pnl;})[0];
-  var bucketLabel=activeBucket?activeBucket[0]:'All times';
+  var sel=document.getElementById('f-time_bucket'); var bucketLabel=(sel&&sel.value)?sel.value:'All times';
   var ps=p>=0?'+':'', pc=p>0?'g':p<0?'r':'', wc=wr>=60?'g':wr>=45?'b':'r';
   document.getElementById('cards').innerHTML=
     mk('Total Trades',''+t,u+' unfilled','')+
@@ -482,8 +410,7 @@ function mk(lbl,val,sub,cls){return '<div class="card"><div class="card-lbl">'+l
 function agg(a){
   var ag=document.getElementById('agg');
   var act=FK.some(function(k){var el=document.getElementById('f-'+k);return el&&el.value!=='';});
-  var bucketActive=activeBucket!==null;
-  if((!act&&!bucketActive)||!a.length){ag.className='agg';return;}
+  if(!act||!a.length){ag.className='agg';return;}
   var w=s(a,'wins'),l=s(a,'losses'),u=s(a,'unfilled'),p=s(a,'pnl'),t=w+l,wr=t>0?(w/t*100):0;
   var ps=(p>=0?'+':'')+'$'+Math.abs(p).toFixed(2),wc=wr>=60?'g':wr<45?'r':'',pc=p>0?'g':p<0?'r':'';
   ag.innerHTML='<span class="agg-ttl">'+a.length+' config'+(a.length!==1?'s':'')+' selected</span>'+
@@ -557,9 +484,7 @@ function go(){
       var rv=r[k];
       return typeof rv==='number'?rv===Number(v):String(rv)===String(v);
     });
-    // Bucket filter
-    var bucketOk=!activeBucket||(r.secs_at_trigger>=activeBucket[1]&&r.secs_at_trigger<activeBucket[2]);
-    return dropOk && bucketOk;
+    return dropOk;
   });
   cards(filtered);
   buildHeatmap(filtered);
