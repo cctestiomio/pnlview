@@ -91,18 +91,7 @@ nav { display:flex; align-items:center; justify-content:space-between; margin-bo
 
 
 /* TIME HEATMAP SECTION */
-.heatmap-wrap { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; margin-bottom:12px; box-shadow:var(--sh); }
-.heatmap-ttl { font-size:.82rem; font-weight:600; margin-bottom:12px; }
-.heatmap-grid { display:flex; flex-wrap:wrap; gap:6px; }
-.hm-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:var(--rsm); border:1px solid var(--border); padding:7px 10px; min-width:80px; cursor:pointer; transition:all .15s; position:relative; }
-.hm-cell:hover { border-color:var(--purple); transform:translateY(-1px); box-shadow:var(--sh2); }
-.hm-cell.active { border-color:var(--purple); background:var(--purple-bg); }
-.hm-range { font-size:.6rem; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--text4); margin-bottom:5px; }
-.hm-wr { font-size:1.1rem; font-weight:700; line-height:1; }
-.hm-wr.g { color:var(--green); } .hm-wr.a { color:var(--amber); } .hm-wr.r { color:var(--red); } .hm-wr.z { color:var(--text4); }
-.hm-trades { font-size:.65rem; color:var(--text4); margin-top:3px; }
-.hm-pnl { font-size:.65rem; font-weight:600; margin-top:2px; }
-.hm-pnl.g { color:var(--green); } .hm-pnl.r { color:var(--red); } .hm-pnl.z { color:var(--text4); }
+
 
 /* AGG */
 .agg { background:var(--accent-bg); border:1px solid color-mix(in srgb,var(--accent) 22%,transparent); border-radius:var(--r); padding:11px 16px; margin-bottom:12px; display:none; align-items:center; flex-wrap:wrap; gap:4px 20px; }
@@ -183,11 +172,6 @@ td.n { font-size:.77rem; font-weight:500; }
 
   </div>
 
-  <!-- Heatmap: winrate by time bucket -->
-  <div class="heatmap-wrap" id="hmwrap">
-    <div class="heatmap-ttl">Winrate by Time Remaining at Trigger</div>
-    <div class="heatmap-grid" id="hmgrid"></div>
-  </div>
 
   <div class="agg" id="agg"></div>
 
@@ -215,8 +199,6 @@ var COLS=[
   {k:'order_price',h:'Limit'},
   {k:'window_min',h:'Win. Min'},
   {k:'window_max',h:'Win. Max'},
-  {k:'time_bucket',h:'Trig. Time'},
-  {k:'secs_at_trigger',h:'Trig. At (s)'},
   {k:'wins',h:'Wins'},
   {k:'losses',h:'Losses'},
   {k:'unfilled',h:'Unfilled'},
@@ -225,7 +207,7 @@ var COLS=[
 ];
 
 // Dropdown filter keys
-var FK=['market','trigger_price','order_price','window_min','window_max','time_bucket'];
+var FK=['market','trigger_price','order_price','window_min','window_max'];
 
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
@@ -250,16 +232,12 @@ function csv(t){
 
 function cook(r){
   var w=parseInt(r.wins)||0, l=parseInt(r.losses)||0, t=w+l;
-  var secs=parseInt(r.secs_at_trigger)||0;
-  function bucketFor(s){var B=[['0–60s',0,60],['60–120s',60,120],['120–180s',120,180],['180–240s',180,240],['240–300s',240,300],['300–450s',300,450],['450–600s',450,600],['600–900s',600,900]];for(var i=0;i<B.length;i++){if(s>=B[i][1]&&s<B[i][2])return B[i][0];}return s+'s';}
   return {
-    market:          r.market||'',
-    trigger_price:   parseFloat(r.trigger_price)||0,
-    order_price:     parseFloat(r.order_price)||0,
-    window_min:      parseInt(r.window_min)||0,
-    window_max:      parseInt(r.window_max)||0,
-    time_bucket:     bucketFor(secs),
-    secs_at_trigger: secs,
+    market:        r.market||'',
+    trigger_price: parseFloat(r.trigger_price)||0,
+    order_price:   parseFloat(r.order_price)||0,
+    window_min:    parseInt(r.window_min)||0,
+    window_max:    parseInt(r.window_max)||0,
     wins:w, losses:l, unfilled:parseInt(r.unfilled)||0,
     pnl:parseFloat(r.pnl)||0,
     winrate:t>0?(w/t)*100:0
@@ -333,60 +311,6 @@ document.getElementById('rbtn').addEventListener('click',function(){
   go();
 });
 
-// ─── Heatmap ──────────────────────────────────────────────────────────────────
-var HM_BUCKETS=[['0–60s',0,60],['60–120s',60,120],['120–180s',120,180],['180–240s',180,240],['240–300s',240,300],['300–450s',300,450],['450–600s',450,600],['600–900s',600,900]];
-
-function buildHeatmap(filtered){
-  var grid=document.getElementById('hmgrid');
-  grid.innerHTML='';
-
-  // Group by bucket using ALL data so heatmap always shows full picture
-  var bucketData={};
-  HM_BUCKETS.forEach(function(b){
-    bucketData[b[0]]={wins:0,losses:0,unfilled:0,pnl:0,count:0};
-  });
-  R.forEach(function(r){
-    HM_BUCKETS.forEach(function(b){
-      if(r.secs_at_trigger>=b[1]&&r.secs_at_trigger<b[2]){
-        var bd=bucketData[b[0]];
-        bd.wins+=r.wins; bd.losses+=r.losses; bd.unfilled+=r.unfilled; bd.pnl+=r.pnl; bd.count++;
-      }
-    });
-  });
-
-  var anyData=false;
-  HM_BUCKETS.forEach(function(b){
-    var bd=bucketData[b[0]];
-    if(!bd.count) return;
-    anyData=true;
-    var total=bd.wins+bd.losses;
-    var wr=total>0?(bd.wins/total*100):0;
-    var wc=wr>=60?'g':wr>=45?'a':'r';
-    if(total===0) wc='z';
-    var ps=(bd.pnl>=0?'+':'')+'$'+Math.abs(bd.pnl).toFixed(2);
-    var pc=bd.pnl>0?'g':bd.pnl<0?'r':'z';
-    var sel=document.getElementById('f-time_bucket');
-    var isActive=sel&&sel.value===b[0];
-
-    var cell=document.createElement('div');
-    cell.className='hm-cell'+(isActive?' active':'');
-    cell.innerHTML=
-      '<div class="hm-range">'+b[0]+'</div>'+
-      '<div class="hm-wr '+wc+'">'+(total===0?'—':wr.toFixed(1)+'%')+'</div>'+
-      '<div class="hm-trades">'+bd.wins+'W / '+bd.losses+'L'+(bd.unfilled?' / '+bd.unfilled+'U':'')+'</div>'+
-      '<div class="hm-pnl '+pc+'">'+ps+'</div>';
-    cell.addEventListener('click',function(){
-      var sel=document.getElementById('f-time_bucket');
-      if(sel){ sel.value=isActive?'':b[0]; }
-      buildHeatmap(filtered);
-      go();
-    });
-    grid.appendChild(cell);
-  });
-
-  document.getElementById('hmwrap').style.display=anyData?'':'none';
-}
-
 // ─── Summary cards ─────────────────────────────────────────────────────────────
 function s(a,k){return a.reduce(function(x,r){return x+r[k];},0);}
 
@@ -394,14 +318,13 @@ function cards(a){
   var w=s(a,'wins'),l=s(a,'losses'),u=s(a,'unfilled'),p=s(a,'pnl'),t=w+l;
   var wr=t>0?(w/t*100):0;
   var best=a.slice().sort(function(a,b){return b.pnl-a.pnl;})[0];
-  var sel=document.getElementById('f-time_bucket'); var bucketLabel=(sel&&sel.value)?sel.value:'All times';
   var ps=p>=0?'+':'', pc=p>0?'g':p<0?'r':'', wc=wr>=60?'g':wr>=45?'b':'r';
   document.getElementById('cards').innerHTML=
     mk('Total Trades',''+t,u+' unfilled','')+
     mk('Win / Loss',w+'<span style="color:var(--text4);font-weight:400;font-size:1rem"> / '+l+'</span>','across '+a.length+' config'+(a.length!==1?'s':''),'')+
     mk('Winrate',wr.toFixed(1)+'%',t+' resolved',wc)+
     mk('Total P/L',ps+'$'+Math.abs(p).toFixed(2),'all configs',pc)+
-    mk('Active Filter','<span style="font-size:.85rem">'+bucketLabel+'</span>',best?'Best P/L: '+(best.pnl>=0?'+':'')+'$'+Math.abs(best.pnl).toFixed(2):'No data','p');
+    mk('Best Config',best?'<span style="font-size:.85rem">'+best.market+'</span>':'—',best?'P/L: '+(best.pnl>=0?'+':'')+'$'+Math.abs(best.pnl).toFixed(2):'No data','p');
 }
 
 function mk(lbl,val,sub,cls){return '<div class="card"><div class="card-lbl">'+lbl+'</div><div class="card-val '+cls+'">'+val+'</div><div class="card-sub">'+sub+'</div></div>';}
@@ -441,11 +364,6 @@ function head(){
   });
 }
 
-function secsLabel(s){
-  if(s===0) return '<span class="tag tu">0s</span>';
-  return '<span class="tag tp">'+s+'s</span>';
-}
-
 function tbl(a){
   head();
   var tb=document.getElementById('tb'), em=document.getElementById('em');
@@ -464,7 +382,6 @@ function tbl(a){
       '<td class="n">$'+r.order_price.toFixed(2)+'</td>'+
       '<td class="n">'+r.window_min+'s</td>'+
       '<td class="n">'+r.window_max+'s</td>'+
-      '<td>'+secsLabel(r.secs_at_trigger)+'</td>'+
       '<td>'+(r.wins>0?'<span class="tag tw">'+r.wins+'W</span>':'<span class="t0">0W</span>')+'</td>'+
       '<td>'+(r.losses>0?'<span class="tag tl">'+r.losses+'L</span>':'<span class="t0">0L</span>')+'</td>'+
       '<td>'+(r.unfilled>0?'<span class="tag tu">'+r.unfilled+'U</span>':'<span class="t0">0U</span>')+'</td>'+
@@ -487,7 +404,6 @@ function go(){
     return dropOk;
   });
   cards(filtered);
-  buildHeatmap(filtered);
   agg(filtered);
   tbl(filtered);
 }
