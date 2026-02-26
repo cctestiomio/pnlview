@@ -7,7 +7,7 @@ cd /d "C:\Users\Sithu\Documents\fasscript\pnlview" || (
   exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\a.ps1" && git add -A && git commit -m "update" && git push
+git add -A && git commit -m "update" && git push
 
 echo.
 echo ExitCode=%errorlevel%
