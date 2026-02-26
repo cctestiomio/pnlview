@@ -216,6 +216,7 @@ var COLS=[
   {k:'window_min',h:'Win. Min'},
   {k:'window_max',h:'Win. Max'},
   {k:'time_bucket',h:'Trig. Time'},
+  {k:'secs_at_trigger',h:'Trig. At (s)'},
   {k:'wins',h:'Wins'},
   {k:'losses',h:'Losses'},
   {k:'unfilled',h:'Unfilled'},
@@ -249,22 +250,16 @@ function csv(t){
 
 function cook(r){
   var w=parseInt(r.wins)||0, l=parseInt(r.losses)||0, t=w+l;
-  // time_bucket comes directly from the CSV (e.g. "120-180s")
-  // Fall back to legacy secs_at_trigger column if old CSV format
-  var bucket=r.time_bucket||'';
-  if(!bucket && r.secs_at_trigger){
-    var s=parseInt(r.secs_at_trigger)||0;
-    var B=[['0-60s',0,60],['60-120s',60,120],['120-180s',120,180],['180-240s',180,240],['240-300s',240,300],['300-450s',300,450],['450-600s',450,600],['600-900s',600,900]];
-    for(var i=0;i<B.length;i++){if(s>=B[i][1]&&s<B[i][2]){bucket=B[i][0];break;}}
-    if(!bucket) bucket=s+'s';
-  }
+  var secs=parseInt(r.secs_at_trigger)||0;
+  function bucketFor(s){var B=[['0–60s',0,60],['60–120s',60,120],['120–180s',120,180],['180–240s',180,240],['240–300s',240,300],['300–450s',300,450],['450–600s',450,600],['600–900s',600,900]];for(var i=0;i<B.length;i++){if(s>=B[i][1]&&s<B[i][2])return B[i][0];}return s+'s';}
   return {
-    market:        r.market||'',
-    trigger_price: parseFloat(r.trigger_price)||0,
-    order_price:   parseFloat(r.order_price)||0,
-    window_min:    parseInt(r.window_min)||0,
-    window_max:    parseInt(r.window_max)||0,
-    time_bucket:   bucket,
+    market:          r.market||'',
+    trigger_price:   parseFloat(r.trigger_price)||0,
+    order_price:     parseFloat(r.order_price)||0,
+    window_min:      parseInt(r.window_min)||0,
+    window_max:      parseInt(r.window_max)||0,
+    time_bucket:     bucketFor(secs),
+    secs_at_trigger: secs,
     wins:w, losses:l, unfilled:parseInt(r.unfilled)||0,
     pnl:parseFloat(r.pnl)||0,
     winrate:t>0?(w/t)*100:0
@@ -351,10 +346,12 @@ function buildHeatmap(filtered){
     bucketData[b[0]]={wins:0,losses:0,unfilled:0,pnl:0,count:0};
   });
   R.forEach(function(r){
-    if(r.time_bucket && bucketData[r.time_bucket]){
-      var bd=bucketData[r.time_bucket];
-      bd.wins+=r.wins; bd.losses+=r.losses; bd.unfilled+=r.unfilled; bd.pnl+=r.pnl; bd.count++;
-    }
+    HM_BUCKETS.forEach(function(b){
+      if(r.secs_at_trigger>=b[1]&&r.secs_at_trigger<b[2]){
+        var bd=bucketData[b[0]];
+        bd.wins+=r.wins; bd.losses+=r.losses; bd.unfilled+=r.unfilled; bd.pnl+=r.pnl; bd.count++;
+      }
+    });
   });
 
   var anyData=false;
@@ -467,6 +464,7 @@ function tbl(a){
       '<td class="n">$'+r.order_price.toFixed(2)+'</td>'+
       '<td class="n">'+r.window_min+'s</td>'+
       '<td class="n">'+r.window_max+'s</td>'+
+      '<td>'+secsLabel(r.secs_at_trigger)+'</td>'+
       '<td>'+(r.wins>0?'<span class="tag tw">'+r.wins+'W</span>':'<span class="t0">0W</span>')+'</td>'+
       '<td>'+(r.losses>0?'<span class="tag tl">'+r.losses+'L</span>':'<span class="t0">0L</span>')+'</td>'+
       '<td>'+(r.unfilled>0?'<span class="tag tu">'+r.unfilled+'U</span>':'<span class="t0">0U</span>')+'</td>'+
